@@ -9,11 +9,31 @@ This package is particularly designed for payload grasping using cable-suspended
 transportation using quadrotor(s).
 For vision/learning supported quadrotor simulators see the links listed below.
 
-##### Citing
+<p float="left">
+  <img src=".media/oneQuadInflight.gif" width="225" /> 
+  <img src=".media/twoQuadHouse.gif" width="225" />
+  <img src=".media/threeQuadGrasp.gif" width="225" />
+</p>
 
-(TODO)
+### Getting Started
 
-##### Other quadrotor simulators
+Go to the [wiki](.docs/home.md) for installation and usage instructions.
+
+
+## Citations
+
+- Dynamics and Control for Collaborative Aerial Manipulation, Prasanth Kotaru, Ph.D. Dissertation, UC Berkeley, December, 2022.
+  
+  ```
+  @phdthesis{kotaru2022dynamics,
+    title={Dynamics and Control for Collaborative Aerial Manipulation},
+    author={Kotaru, Prasanth},
+    year={2022},
+    school={UC Berkeley}
+  }
+  ```
+
+## Other quadrotor simulators
 
 - Udaan (python/mujoco based)
 - [PX4 Autopilot](https://docs.px4.io/main/en/simulation/)
