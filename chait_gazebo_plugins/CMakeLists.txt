@@ -12,6 +12,8 @@ find_package(catkin REQUIRED COMPONENTS
         std_msgs
         chait_msgs
 
+        chait_control
+
         ddynamic_reconfigure
         tf2
         tf2_ros

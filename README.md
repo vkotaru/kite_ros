@@ -1,6 +1,6 @@
 # chait_ros
 
-CHAIT (pronounced `kite`): **C**able-suspended **H**ybrid **A**erial **I**nflight-grasping and **T**ransportation
+CHAIT :kite:  (pronounced `kite`): **C**able-suspended **H**ybrid **A**erial **I**nflight-grasping and **T**ransportation
 
 ROS1/Gazebo plugins for cable-suspended collaborative aerial manipulation simulations developed for *Dynamics and
 Control for Collaborative Aerial Manipulation* dissertation.

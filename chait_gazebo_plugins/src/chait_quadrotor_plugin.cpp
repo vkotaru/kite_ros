@@ -25,6 +25,13 @@ void CHAITQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
           << std::endl;
   }
 
+  // Note, all ros messages are published at the same rate
+  if (_sdf->HasElement("publishRate")) {
+    this->ros_publish_rate_Hz = _sdf->GetElement("publishRate")->Get<double>();
+    gzdbg << "[" << plugin_name_ << "] publish rate " << ros_publish_rate_Hz
+          << std::endl;
+  }
+
   // read system parameters
   // Inertial setup
   d.inertia << link_->GetInertial()->IXX(), link_->GetInertial()->IXY(),
@@ -34,13 +41,22 @@ void CHAITQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
       link_->GetInertial()->IZZ();
   d.inertia_inv = d.inertia.inverse();
   d.mass = link_->GetInertial()->Mass();
+  attitude_controller_.updateInertia(d.inertia);
+
+  pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
+      "chait_quadrotor_plugin/odometry", 1);
+  sub_command_ =
+      this->nh_->subscribe("chait_quadrotor_plugin/command", 10,
+                           &CHAITQuadrotorPlugin::commandCallback, this);
 
 #if GAZEBO_MAJOR_VERSION >= 8
   this->last_time_ = this->world_->SimTime();
   this->outerloop_last_time_ = this->world_->SimTime();
+  this->last_ros_publish_time_ = this->world_->SimTime();
 #else
   this->last_time_ = this->world_->GetSimTime();
   this->outerloop_last_time_ = this->world_->GetSimTime();
+  this->last_ros_publish_time_ = this->world_->GetSimTime();
 #endif
 
   updateConnection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
@@ -67,10 +83,8 @@ void CHAITQuadrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
     // too fast; 1./outerloop_Hz time hasn't elapsed yet!
   } else {
     double dt_s = cur_time.Double() - outerloop_last_time_.Double();
-    printf("out_freq, %f\n", 1. / dt_s);
-
     queryState();
-    computePosInput();
+    positionControlLoop(dt_s);
     outerloop_last_time_ = cur_time;
   }
 
@@ -81,11 +95,18 @@ void CHAITQuadrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
   } else {
     // compute "dt"
     double dt_s = cur_time.Double() - last_time_.Double();
-    printf("inner_freq, %f\n", 1. / dt_s);
-
     queryState();
-    computeAttInput();
+    attitudeControlLoop(dt_s);
     last_time_ = cur_time;
+  }
+
+  // publish
+  if (ros_publish_rate_Hz > 0 && (cur_time - last_ros_publish_time_).Double() <
+                                     (1.0 / this->ros_publish_rate_Hz)) {
+    // too fast; (1./ros_publish_rate_Hz) time hasn't elapsed yet!
+  } else {
+    rosPublish();
+    last_ros_publish_time_ = cur_time;
   }
 
   // apply wrench to the quadrotor rigid body
@@ -98,31 +119,39 @@ void CHAITQuadrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
 }
 
 void CHAITQuadrotorPlugin::queryState() {
+  // TODO use an independent rate for state query
   if (!is_state_queried_recently) {
-    auto gpose = link_->WorldCoGPose();
-    auto gvel = link_->RelativeLinearVel();
-    auto gomega = link_->RelativeAngularVel();
+    auto gz_pose = link_->WorldCoGPose();
+    auto gz_vel = link_->RelativeLinearVel();
+    auto gz_omega = link_->RelativeAngularVel();
+
+    d.state.position = vec3GazeboToEigen(gz_pose.Pos());
+    d.state.velocity = vec3GazeboToEigen(gz_vel);
+    d.state.ang_vel = vec3GazeboToEigen(gz_omega);
+    d.state.rotation = gazeboQuaternionToEigenMatrix(gz_pose.Rot());
+
     is_state_queried_recently = true;
   }
 }
 
-void CHAITQuadrotorPlugin::computePosInput() {
-  // double dt = pos_clock_.time();
-  // // compute input
-  // if (controller_.mode() == QrotorControl::POSITION ||
-  //     controller_.mode() == QrotorControl::POSITION_SPLINE) {
-  //   controller_.computePositionInput(dt);
-  // }
-  // // publish pose
-  // rosPublish();
+void CHAITQuadrotorPlugin::positionControlLoop(const double dt) {
+  if (mode_ == chait_msgs::QCommand::MODE_POSITION ||
+      mode_ == chait_msgs::QCommand::MODE_POSITION_SPLINE) {
+
+    d.thrust_v = d.mass * position_controller_.Update(dt, d.state.position,
+                                                      d.state.velocity);
+  }
 }
 
-void CHAITQuadrotorPlugin::computeAttInput() {
-  // double dt = att_clock_.time();
-  // // compute input
-  // if (controller_.mode() != QrotorControl::PASS_THROUGH) {
-  //   controller_.computeAttitudeInput(dt);
-  // }
+void CHAITQuadrotorPlugin::attitudeControlLoop(const double dt) {
+
+  if (mode_ != chait_msgs::QCommand::MODE_PASS_THROUGH) {
+
+    d.scalar_thrust = d.thrust_v.dot(d.state.rotation.col(2));
+    attitude_controller_.updateCommand(d.thrust_v);
+    d.moment =
+        attitude_controller_.Update(dt, d.state.rotation, d.state.ang_vel);
+  }
 }
 
 void CHAITQuadrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
@@ -147,7 +176,7 @@ void CHAITQuadrotorPlugin::rosPublish() {
   tf::pointEigenToMsg(pose.pos, odometry_.pose.pose.position);
   tf::vectorEigenToMsg(pose.vel, odometry_.twist.twist.linear);
   tf::vectorEigenToMsg(pose.omega, odometry_.twist.twist.angular);
-  pub_odom_truth_.publish(odometry_);
+    pub_odom_truth_.publish(odometry_);
 }
 
 void CHAITQuadrotorPlugin::commandCallback(
@@ -159,27 +188,27 @@ void CHAITQuadrotorPlugin::commandCallback(
   case chait_msgs::QCommand::MODE_POSITION: {
     switch (msg->command.values.size()) {
     case 3:
-      // controller_.posCtrl_.updateSetpoint(
-      //     Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
-      //                     msg->command.values[0].z),
-      //     Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
-      //                     msg->command.values[1].z),
-      //     Eigen::Vector3d(msg->command.values[2].x, msg->command.values[2].y,
-      //                     msg->command.values[2].z));
+      position_controller_.updateSetpoint(
+          Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
+                          msg->command.values[0].z),
+          Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
+                          msg->command.values[1].z),
+          Eigen::Vector3d(msg->command.values[2].x, msg->command.values[2].y,
+                          msg->command.values[2].z));
       break;
 
     case 2:
-      // controller_.posCtrl_.updateSetpoint(
-          // Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
-          //                 msg->command.values[0].z),
-          // Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
-          //                 msg->command.values[1].z));
+      position_controller_.updateSetpoint(
+          Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
+                          msg->command.values[0].z),
+          Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
+                          msg->command.values[1].z));
       break;
 
     case 1:
-      // controller_.posCtrl_.updateSetpoint(
-      //     Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
-      //                     msg->command.values[0].z));
+      position_controller_.updateSetpoint(
+          Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
+                          msg->command.values[0].z));
       break;
 
     default:
@@ -188,10 +217,10 @@ void CHAITQuadrotorPlugin::commandCallback(
   } break;
 
   case chait_msgs::QCommand::MODE_THRUST_YAW: {
-    // controller_.skipComputingPosInput(
-    //     Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
-    //                     msg->command.values[0].z));
-    // controller_.attCtrl_.updateYawSP(msg->command.yaw[0]);
+    d.thrust_v =
+        Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
+                        msg->command.values[0].z);
+    attitude_controller_.updateYawSetpoint(msg->command.yaw[0]);
     break;
   }
 

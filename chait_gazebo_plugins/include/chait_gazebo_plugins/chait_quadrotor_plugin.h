@@ -11,10 +11,19 @@
 #include <nav_msgs/Odometry.h>
 #include <chait_msgs/QCommandStamped.h>
 
+#include "chait_control/chait_control.h"
+
 namespace chait_ros {
 
 class CHAITQuadrotorPlugin : public CHAITGazeboPlugin {
 public:
+  struct State {
+    Eigen::Matrix3d rotation;
+    Eigen::Vector3d position;
+    Eigen::Vector3d velocity;
+    Eigen::Vector3d ang_vel;
+  };
+
   struct DataContainer {
     DataContainer() {
       inertia.setIdentity();
@@ -24,25 +33,26 @@ public:
     Eigen::Matrix3d inertia{};
     Eigen::Matrix3d inertia_inv{};
 
-    double scalar_thrust{1.};
+    State state;
+
+    double scalar_thrust{0.};
+    Eigen::Vector3d thrust_v{0., 0., 0.};
     Eigen::Vector3d moment{0., 0., 0.};
 
   };
 
 public:
   CHAITQuadrotorPlugin();
-  ~CHAITQuadrotorPlugin() = default;
+  ~CHAITQuadrotorPlugin() override = default;
 
 protected:
   void Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf) override;
   void OnUpdate(const gazebo::common::UpdateInfo &_info);
 
   gazebo::common::Time outerloop_last_time_;
+  gazebo::common::Time last_ros_publish_time_;
   double outerloop_Hz{100.};
-  double outerloop_dt_s{0.01};
-
-  int MAX_POS_CTRL_COUNT = 3;
-  int pos_ctrl_counter = 0;
+  double ros_publish_rate_Hz{100.};
 
   DataContainer d{};
   uint8_t mode_{chait_msgs::QCommand::MODE_THRUST_YAW};
@@ -51,8 +61,11 @@ protected:
   void queryState();
   bool is_state_queried_recently{false};
 
-  void computePosInput();
-  void computeAttInput();
+  PositionController position_controller_{};
+  SO3Controller attitude_controller_{};
+
+  void positionControlLoop(double dt);
+  void attitudeControlLoop(double dt);
   ros::Publisher pub_odom_truth_;
   ros::Subscriber sub_command_;
 

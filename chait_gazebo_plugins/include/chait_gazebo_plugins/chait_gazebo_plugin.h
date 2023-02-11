@@ -18,7 +18,7 @@ public:
 
 protected:
   void Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf) override;
-  void OnUpdate(const gazebo::common::UpdateInfo &_info);
+  virtual void OnUpdate(const gazebo::common::UpdateInfo &_info);
   void loadAndReadDefaultParams(gazebo::physics::ModelPtr _model,
                                           sdf::ElementPtr _sdf);
   virtual void run();

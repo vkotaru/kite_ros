@@ -28,6 +28,8 @@
   <depend>gazebo_plugins</depend>
   <depend>gazebo_ros</depend>
 
+  <depend>chait_control</depend>
+
   <depend>ddynamic_reconfigure</depend>
 
   <export>
