@@ -13,17 +13,6 @@ void CHAITQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
                                 sdf::ElementPtr _sdf) {
   loadAndReadDefaultParams(_model, _sdf);
   // read params from sdf specific to this plugin
-  if (!_sdf->HasElement("outerUpdateRate")) {
-    gzdbg << "[" << plugin_name_
-          << "] missing <outerUpdateRate>, "
-             "defaults to 100.0"
-             " (as fast as possible)\n";
-    this->outerloop_Hz = 100.0;
-  } else {
-    this->outerloop_Hz = _sdf->GetElement("outerUpdateRate")->Get<double>();
-    gzdbg << "[" << plugin_name_ << "] outerloop update rate " << outerloop_Hz
-          << std::endl;
-  }
 
   // Note, all ros messages are published at the same rate
   if (_sdf->HasElement("publishRate")) {
@@ -49,15 +38,9 @@ void CHAITQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
       this->nh_->subscribe("chait_quadrotor_plugin/command", 10,
                            &CHAITQuadrotorPlugin::commandCallback, this);
 
-#if GAZEBO_MAJOR_VERSION >= 8
   this->last_time_ = this->world_->SimTime();
-  this->outerloop_last_time_ = this->world_->SimTime();
-  this->last_ros_publish_time_ = this->world_->SimTime();
-#else
-  this->last_time_ = this->world_->GetSimTime();
-  this->outerloop_last_time_ = this->world_->GetSimTime();
-  this->last_ros_publish_time_ = this->world_->GetSimTime();
-#endif
+  pos_timer_.init(this->world_->SimTime());
+  att_timer_.init(this->world_->SimTime());
 
   updateConnection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
       boost::bind(&CHAITQuadrotorPlugin::OnUpdate, this, _1));
@@ -67,74 +50,38 @@ void CHAITQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
 
 void CHAITQuadrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
 
-#if GAZEBO_MAJOR_VERSION >= 8
   cur_time = this->world_->SimTime();
-#else
-  cur_time = this->world_->GetSimTime();
-#endif
   if (cur_time < last_time_) {
     gzdbg << "[QuadrotorSIL] Negative update time difference detected.\n";
     last_time_ = cur_time;
   }
 
-  // outer loop
-  if (outerloop_Hz > 0 &&
-      (cur_time - outerloop_last_time_).Double() < (1.0 / this->outerloop_Hz)) {
-    // too fast; 1./outerloop_Hz time hasn't elapsed yet!
-  } else {
-    double dt_s = cur_time.Double() - outerloop_last_time_.Double();
-    queryState();
-    positionControlLoop(dt_s);
-    outerloop_last_time_ = cur_time;
-  }
-
-  // inner loop
-  if (update_rate_Hz > 0 &&
-      (cur_time - last_time_).Double() < (1.0 / this->update_rate_Hz)) {
-    // too fast; (1./update_rate_Hz) time hasn't elapsed yet!
-  } else {
-    // compute "dt"
-    double dt_s = cur_time.Double() - last_time_.Double();
-    queryState();
-    attitudeControlLoop(dt_s);
-    last_time_ = cur_time;
-  }
-
-  // publish
-  if (ros_publish_rate_Hz > 0 && (cur_time - last_ros_publish_time_).Double() <
-                                     (1.0 / this->ros_publish_rate_Hz)) {
-    // too fast; (1./ros_publish_rate_Hz) time hasn't elapsed yet!
-  } else {
-    rosPublish();
-    last_ros_publish_time_ = cur_time;
-  }
+  queryState();
+  pos_timer_.run(cur_time);
+  att_timer_.run(cur_time);
 
   // apply wrench to the quadrotor rigid body
   Eigen::Vector3d body_force_body_frame = d.scalar_thrust * E3;
   Eigen::Vector3d body_moment_body_frame = d.moment;
   applyWrench(body_force_body_frame, body_moment_body_frame);
 
-  // reset flags
-  is_state_queried_recently = false;
+  last_time_ = cur_time;
 }
 
 void CHAITQuadrotorPlugin::queryState() {
   // TODO use an independent rate for state query
-  if (!is_state_queried_recently) {
-    auto gz_pose = link_->WorldCoGPose();
-    auto gz_vel = link_->RelativeLinearVel();
-    auto gz_omega = link_->RelativeAngularVel();
+  auto gz_pose = link_->WorldCoGPose();
+  auto gz_vel = link_->RelativeLinearVel();
+  auto gz_omega = link_->RelativeAngularVel();
 
-    d.state.position = vec3GazeboToEigen(gz_pose.Pos());
-    d.state.velocity = vec3GazeboToEigen(gz_vel);
-    d.state.ang_vel = vec3GazeboToEigen(gz_omega);
-    d.state.rotation = gazeboQuaternionToEigenMatrix(gz_pose.Rot());
-
-    is_state_queried_recently = true;
-  }
+  d.state.position = vec3GazeboToEigen(gz_pose.Pos());
+  d.state.velocity = vec3GazeboToEigen(gz_vel);
+  d.state.ang_vel = vec3GazeboToEigen(gz_omega);
+  d.state.rotation = gazeboQuaternionToEigenMatrix(gz_pose.Rot());
 }
 
 void CHAITQuadrotorPlugin::positionControlLoop(const double dt) {
+
   if (mode_ == chait_msgs::QCommand::MODE_POSITION ||
       mode_ == chait_msgs::QCommand::MODE_POSITION_SPLINE) {
 
@@ -146,7 +93,6 @@ void CHAITQuadrotorPlugin::positionControlLoop(const double dt) {
 void CHAITQuadrotorPlugin::attitudeControlLoop(const double dt) {
 
   if (mode_ != chait_msgs::QCommand::MODE_PASS_THROUGH) {
-
     d.scalar_thrust = d.thrust_v.dot(d.state.rotation.col(2));
     attitude_controller_.updateCommand(d.thrust_v);
     d.moment =
@@ -176,7 +122,7 @@ void CHAITQuadrotorPlugin::rosPublish() {
   tf::pointEigenToMsg(pose.pos, odometry_.pose.pose.position);
   tf::vectorEigenToMsg(pose.vel, odometry_.twist.twist.linear);
   tf::vectorEigenToMsg(pose.omega, odometry_.twist.twist.angular);
-    pub_odom_truth_.publish(odometry_);
+  pub_odom_truth_.publish(odometry_);
 }
 
 void CHAITQuadrotorPlugin::commandCallback(

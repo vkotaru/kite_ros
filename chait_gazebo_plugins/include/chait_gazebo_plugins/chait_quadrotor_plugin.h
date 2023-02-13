@@ -8,8 +8,8 @@
 #include "chait_gazebo_plugins/chait_gazebo_plugin.h"
 #include <eigen_conversions/eigen_msg.h>
 
-#include <nav_msgs/Odometry.h>
 #include <chait_msgs/QCommandStamped.h>
+#include <nav_msgs/Odometry.h>
 
 #include "chait_control/chait_control.h"
 
@@ -38,8 +38,18 @@ public:
     double scalar_thrust{0.};
     Eigen::Vector3d thrust_v{0., 0., 0.};
     Eigen::Vector3d moment{0., 0., 0.};
-
   };
+
+  enum class STATE {
+    IDLE,
+    TAKEOFF,
+    HOLD,
+    LAND,
+    CRASHED,
+    COUNT
+  };
+
+  
 
 public:
   CHAITQuadrotorPlugin();
@@ -51,7 +61,6 @@ protected:
 
   gazebo::common::Time outerloop_last_time_;
   gazebo::common::Time last_ros_publish_time_;
-  double outerloop_Hz{100.};
   double ros_publish_rate_Hz{100.};
 
   DataContainer d{};
@@ -59,17 +68,22 @@ protected:
 
   GazeboPose initial_pose_{};
   void queryState();
-  bool is_state_queried_recently{false};
 
   PositionController position_controller_{};
   SO3Controller attitude_controller_{};
 
   void positionControlLoop(double dt);
   void attitudeControlLoop(double dt);
+
+  GazeboTimer pos_timer_{100.,
+                         [this](double dt) { this->positionControlLoop(dt); }};
+  GazeboTimer att_timer_{500.,
+                         [this](double dt) { this->attitudeControlLoop(dt); }};
+
   ros::Publisher pub_odom_truth_;
   ros::Subscriber sub_command_;
 
-   void commandCallback(const chait_msgs::QCommandStamped::ConstPtr &msg);
+  void commandCallback(const chait_msgs::QCommandStamped::ConstPtr &msg);
 
   // plugin functions
   void applyWrench(const Eigen::Vector3d &thrust_v,

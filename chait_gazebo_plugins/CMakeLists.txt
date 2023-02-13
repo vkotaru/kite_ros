@@ -22,8 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
 
         gazebo_plugins
         gazebo_ros
-        #  gazebo_ros_link_attacher
-        )
+)
 
 find_package(Eigen3 REQUIRED)
 

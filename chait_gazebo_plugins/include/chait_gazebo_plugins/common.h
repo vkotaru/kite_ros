@@ -18,6 +18,7 @@
 #include <gazebo/sensors/sensors.hh>
 #include <ros/ros.h>
 
+#include <functional>
 #include <gazebo/gazebo.hh>
 
 #if GAZEBO_MAJOR_VERSION >= 8
@@ -63,6 +64,36 @@ public:
   double dt() const { return dt_; }
 };
 
+class GazeboTimer {
+public:
+  GazeboTimer(const double rate, std::function<void(double)> function)
+      : rate_Hz(rate), function(function) {
+    req_dt_s = 1. / rate_Hz;
+  }
+
+  std::function<void(double)> function;
+  double rate_Hz{100.};
+  double req_dt_s{0.01};
+  gazebo::common::Time last_time_{};
+
+  void set_rate(const double rate) {
+    rate_Hz = rate;
+    req_dt_s = 1. / rate_Hz;
+  }
+
+  void init(const gazebo::common::Time &curr) { last_time_ = curr; }
+
+  void run(const gazebo::common::Time &curr) {
+    double curr_dt_s = (curr - last_time_).Double();
+    if (rate_Hz > 0 && (curr_dt_s < req_dt_s)) {
+      // nothing
+    } else {
+      function(curr_dt_s);
+      last_time_ = curr;
+    }
+  }
+};
+
 inline Eigen::Vector3d vec3GazeboToEigen(GazeboVector vec) {
 #if GAZEBO_MAJOR_VERSION >= 8
   return Eigen::Vector3d(vec.X(), vec.Y(), vec.Z());
@@ -86,7 +117,6 @@ inline Eigen::Quaterniond quaternionGazeboToEigen(GazeboQuaternion quat) {
 inline Eigen::Matrix3d gazeboQuaternionToEigenMatrix(GazeboQuaternion quat) {
   return quaternionGazeboToEigen(quat).toRotationMatrix();
 }
-
 
 struct Pose3D {
 public:
@@ -124,7 +154,6 @@ public:
   Eigen::Vector3d omega{};
   double t{0};
 };
-
 
 } // namespace chait_ros
 
