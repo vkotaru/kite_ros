@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(chait_control)
 
-add_compile_options(-std=c++14)
+add_compile_options(-std=c++17)
 
 find_package(catkin REQUIRED COMPONENTS
         roscpp
@@ -20,6 +20,6 @@ include_directories(
 )
 
 
-add_library(chait_control INTERFACE include)
-target_include_directories(chait_control INTERFACE include)
+add_library(chait_control INTERFACE)
+target_include_directories(chait_control INTERFACE)
 

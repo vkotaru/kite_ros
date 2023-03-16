@@ -1,14 +1,12 @@
 //
 // Created by kotaru on 2/11/23.
 //
-#ifndef CHAIT_ROS_CHAIT_CONTROL_CHAIT_CONTROL_POSITION_CONTROL_H_
-#define CHAIT_ROS_CHAIT_CONTROL_CHAIT_CONTROL_POSITION_CONTROL_H_ \
+#ifndef CHAIT_ROS_CHAIT_CONTROL_POSITION_CONTROL_H_
+#define CHAIT_ROS_CHAIT_CONTROL_POSITION_CONTROL_H_
 
 #include <eigen3/Eigen/Dense>
 
-namespace chait_ros {
-
-
+namespace chait_ros::control {
 class PositionController {
 private:
   Eigen::Vector3d kp_{4.0, 4.0, 8.0};
@@ -37,6 +35,7 @@ public:
   }
   ~PositionController() = default;
 
+  virtual void init() {}
 
   void updateSetpoint(const Eigen::Vector3d &xd) {
     this->xd = xd;
@@ -56,7 +55,7 @@ public:
   }
 
   Eigen::Vector3d Update(const double dt, const Eigen::Vector3d &pos,
-                      const Eigen::Vector3d &vel) {
+                         const Eigen::Vector3d &vel) {
     Eigen::Vector3d pos_err = pos - xd;
     Eigen::Vector3d vel_err = vel - vd;
     Eigen::Vector3d cmd_accel;
@@ -80,14 +79,13 @@ public:
     }
 
     // feed-forward input
-    cmd_accel += (ad + g_v) ;
+    cmd_accel += (ad + g_v);
 
     // input-bounds
     return (cmd_accel.cwiseMax(ACCEL_LOWER_BOUND)).cwiseMin(ACCEL_UPPER_BOUND);
   }
 };
 
+} // namespace chait_ros::control
 
-}
-
-#endif // CHAIT_ROS_CHAIT_CONTROL_CHAIT_CONTROL_POSITION_CONTROL_H_
+#endif // CHAIT_ROS_CHAIT_CONTROL_POSITION_CONTROL_H_

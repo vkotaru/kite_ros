@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.0.2)
 project(chait_gazebo_plugins)
 find_package(gazebo)
 
-
 add_compile_options(-std=c++17)
 
 find_package(catkin REQUIRED COMPONENTS
@@ -32,7 +31,6 @@ catkin_package(
         CATKIN_DEPENDS geometry_msgs nav_msgs roscpp std_msgs gazebo_plugins gazebo_ros
         DEPENDS EIGEN3 GAZEBO
 )
-
 
 include_directories(
         include

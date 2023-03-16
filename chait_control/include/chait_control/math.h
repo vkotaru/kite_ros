@@ -8,7 +8,7 @@
 #include <eigen3/Eigen/Dense>
 
 namespace chait_ros {
-
+namespace control {
 /**
  * @brief vee map
  * @param[in] input matrix
@@ -28,7 +28,7 @@ inline Eigen::Matrix3d hat3d(Eigen::Vector3d v) {
           0.0)
       .finished();
 }
-
+} // namespace control
 } // namespace chait_ros
 
 #endif // CHAIT_ROS_CHAIT_CONTROL_MATH_H_

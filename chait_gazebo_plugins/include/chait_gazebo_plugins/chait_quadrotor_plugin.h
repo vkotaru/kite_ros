@@ -69,8 +69,8 @@ protected:
   GazeboPose initial_pose_{};
   void queryState();
 
-  PositionController position_controller_{};
-  SO3Controller attitude_controller_{};
+  control::PositionController position_controller_{};
+  control::SO3Controller attitude_controller_{};
 
   void positionControlLoop(double dt);
   void attitudeControlLoop(double dt);

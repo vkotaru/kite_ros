@@ -8,8 +8,14 @@
 #include "chait_control/math.h"
 #include <eigen3/Eigen/Dense>
 
-namespace chait_ros {
+namespace chait_ros::control {
 
+/**
+ * Implements Geometric control on SO(3) from
+ * Lee, Taeyoung, Melvin Leok, and N. Harris McClamroch. "Geometric tracking
+ * control of a quadrotor UAV on SE (3)." In 49th IEEE conference on decision
+ * and control (CDC), pp. 5420-5425. IEEE, 2010.
+ */
 class SO3Controller {
 private:
   Eigen::Vector3d kp_{8.0, 8.0, 3.0};
@@ -45,7 +51,8 @@ public:
   void updateYawSetpoint(const double &_yaw) { yaw_sp = _yaw; }
 
   void updateCommand(const Eigen::Vector3d &thrust_v) {
-    Eigen::Vector3d E1d{E1}, E1c{E1}, E2c{E2}, E3c{E3};
+    Eigen::Vector3d E1d{1., 0., 0}, E1c{1., 0., 0.}, E2c{0., 1., 0},
+        E3c{0., 0., 1};
 
     thrust_vector_ = thrust_v;
     if (!(std::isnan(thrust_vector_.norm()) ||
@@ -81,6 +88,6 @@ public:
     return u;
   }
 };
-} // namespace chait_ros
+} // namespace chait_ros::control
 
 #endif // CHAIT_ROS_CHAIT_CONTROL_QUADROTOR_TLEE_CONTROL_H_
