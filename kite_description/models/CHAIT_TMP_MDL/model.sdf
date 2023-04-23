@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+<model name="KITE_TMP_MDL">
+<static> 0 </static>
+</model>
+</sdf>
