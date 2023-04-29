@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
         nav_msgs
         roscpp
         std_msgs
+        eigen_conversions
         )
 
 catkin_package(
@@ -30,8 +31,14 @@ set(SRCS
         src/drone_manager.cpp
         src/drone_companion.cpp)
 
+# Libraries
+#############
 add_library(kite_companions ${SRCS})
 add_dependencies(kite_companions ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(kite_companions ${catkin_LIBRARIES})
 
-
+# Executables
+#############
+add_executable(drone_companion_node src/nodes/drone_companion_node.cpp)
+add_dependencies(drone_companion_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(drone_companion_node ${catkin_LIBRARIES} kite_companions)

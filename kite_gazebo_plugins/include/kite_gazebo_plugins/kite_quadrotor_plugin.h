@@ -61,34 +61,33 @@ protected:
 
   gazebo::common::Time outerloop_last_time_;
   gazebo::common::Time last_ros_publish_time_;
-  double ros_publish_rate_Hz{100.};
 
   DataContainer d{};
   uint8_t mode_{kite_msgs::QCommand::MODE_THRUST_YAW};
 
   GazeboPose initial_pose_{};
-  void queryState();
+  void QueryState();
 
   control::PositionController position_controller_{};
   control::SO3Controller attitude_controller_{};
 
-  void positionControlLoop(double dt);
-  void attitudeControlLoop(double dt);
+  void PositionControlLoop(double dt);
+  void AttitudeControlLoop(double dt);
 
-  GazeboTimer pos_timer_{100.,
-                         [this](double dt) { this->positionControlLoop(dt); }};
-  GazeboTimer att_timer_{500.,
-                         [this](double dt) { this->attitudeControlLoop(dt); }};
+  double att_loop_rate_Hz{500.};
+  double pos_loop_rate_Hz{100.};
+  double ros_publish_rate_Hz{200.};
+  std::vector<std::unique_ptr<GazeboTimer>> timers_;
 
   ros::Publisher pub_odom_truth_;
   ros::Subscriber sub_command_;
 
-  void commandCallback(const kite_msgs::QCommandStamped::ConstPtr &msg);
+  void CommandCallback(const kite_msgs::QCommandStamped::ConstPtr &msg);
 
   // plugin functions
-  void applyWrench(const Eigen::Vector3d &thrust_v,
+  void ApplyWrench(const Eigen::Vector3d &thrust_v,
                    const Eigen::Vector3d &moment_v);
-  void rosPublish();
+  void PublishRosTopics(const double dt);
 };
 
 } // namespace kite_ros

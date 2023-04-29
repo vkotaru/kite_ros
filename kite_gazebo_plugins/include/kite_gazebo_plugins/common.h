@@ -43,27 +43,6 @@ static Eigen::Vector3d E1{1., 0., 0.};
 static Eigen::Vector3d E2{0., 1., 0.};
 static Eigen::Vector3d E3{0., 0., 1.};
 
-class RosClock {
-public:
-  RosClock() {
-    now_s = ros::Time::now().toSec();
-    last_update_s = ros::Time::now().toSec();
-  }
-  double now_s{0.};
-  double last_update_s{0.};
-  double dt_{0.};
-  void run() {
-    now_s = ros::Time::now().toSec();
-    dt_ = (now_s - last_update_s);
-    last_update_s = now_s;
-  }
-  double time() {
-    run();
-    return dt();
-  }
-  double dt() const { return dt_; }
-};
-
 class GazeboTimer {
 public:
   GazeboTimer(const double rate, std::function<void(double)> function)

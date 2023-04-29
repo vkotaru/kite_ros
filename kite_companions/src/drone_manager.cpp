@@ -16,12 +16,12 @@ DroneManager::DroneManager(Data *data_ptr) : d(*data_ptr) {
       std::make_unique<control::PositionController>());
 }
 
-void DroneManager::init() {
+void DroneManager::Initialize() {
   for (auto &controller : position_controllers_map_)
     controller.second->init();
 }
 
-void DroneManager::land(const double t) {
+void DroneManager::LandInternal(const double t) {
   config_.mode = FLIGHT_MODE::LAND;
   config_.start_time = t;
   config_.end_time = 3;
@@ -30,10 +30,10 @@ void DroneManager::land(const double t) {
   end_pt(2) = d.home_position(2);
   std::cout << "Landing position " << end_pt.transpose() << std::endl;
   traj_gen_.go_to.reset(t, d.state.position, end_pt, 3);
-  setControlType(POSITION_CONTROL::POSITION_PID);
+  SetControlType(POSITION_CONTROL::POSITION_PID);
 }
 
-void DroneManager::takeoff(const double t) {
+void DroneManager::TakeoffInternal(const double t) {
   config_.mode = FLIGHT_MODE::TAKEOFF;
   config_.start_time = t;
   config_.end_time = 3;
@@ -42,29 +42,29 @@ void DroneManager::takeoff(const double t) {
   end_pt(2) = 1.5;
   std::cout << "Takeoff position " << end_pt.transpose() << std::endl;
   traj_gen_.go_to.reset(t, d.state.position, end_pt, 3);
-  setControlType(POSITION_CONTROL::POSITION_PID);
+  SetControlType(POSITION_CONTROL::POSITION_PID);
 }
 
-bool DroneManager::setControlType(const POSITION_CONTROL &control_type) {
+bool DroneManager::SetControlType(const POSITION_CONTROL &control_type) {
   if (position_controllers_map_.find(control_type) ==
       position_controllers_map_.end()) {
     Logger::ERROR("Control type not found");
     return false;
   }
-  current_ctrl_type = control_type;
+  current_ctrl = control_type;
   return true;
 }
 
-bool DroneManager::setFlightMode(const double t, const EVENT &event_req) {
+bool DroneManager::SetFlightMode(const double t, const EVENT &event_req) {
   switch (config_.mode) {
   case FLIGHT_MODE::IDLE:
     if (event_req == EVENT::REQUEST_TAKEOFF)
-      takeoff(t);
+      TakeoffInternal(t);
     break;
 
   case FLIGHT_MODE::TAKEOFF:
     if (event_req == EVENT::REQUEST_LANDING)
-      land(t);
+      LandInternal(t);
     break;
 
   case FLIGHT_MODE::SETPOINT: {
@@ -73,7 +73,7 @@ bool DroneManager::setFlightMode(const double t, const EVENT &event_req) {
       traj_gen_.setpoint.reset(d.setpoint_buffer);
       d.flats = traj_gen_.setpoint.run(0);
     } else if (event_req == EVENT::REQUEST_LANDING) {
-      land(t);
+      LandInternal(t);
     } else if (event_req == EVENT::REQUEST_TRAJECTORY) {
       std::cout << "EVENT::REQUEST_TRAJECTORY not implemented" << std::endl;
       return false;
@@ -99,12 +99,12 @@ bool DroneManager::setFlightMode(const double t, const EVENT &event_req) {
   }
 
   case FLIGHT_MODE::LAND: {
-    std::cout << "Drone landing! Cannot change the mode";
+    std::cout << "Drone LandInternaling! Cannot change the mode";
     break;
   }
   case FLIGHT_MODE::TRAJECTORY:
     if (event_req == EVENT::REQUEST_LANDING)
-      land(t);
+      LandInternal(t);
     break;
 
   default:
@@ -115,7 +115,7 @@ bool DroneManager::setFlightMode(const double t, const EVENT &event_req) {
   return true;
 }
 
-void DroneManager::updateCommandTraj(const double t) {
+void DroneManager::UpdateCommandTraj(const double t) {
   switch (config_.mode) {
   case FLIGHT_MODE::TAKEOFF: {
     if (config_.time(t) > config_.end_time) {
@@ -152,7 +152,7 @@ void DroneManager::updateCommandTraj(const double t) {
       d.flats = traj_gen_.setpoint.run(0);
       std::cout << "Landing complete switching to IDLE" << std::endl;
       config_.mode = FLIGHT_MODE::IDLE;
-      // Be in drone control mode for landing
+      // Be in drone control mode for LandInternaling
     } else {
       d.flats = traj_gen_.go_to.run(t);
     }
@@ -190,17 +190,18 @@ void DroneManager::updateCommandTraj(const double t) {
   }
 }
 
-
-void DroneManager::run(const double t) {
+void DroneManager::Run() {
   // update the command
-  updateCommandTraj(t);
+  UpdateCommandTraj(d.time_.t_s);
 
   // update the controller setpoint
   // TODO: avoid passing this everytime
-  position_controllers_map_[current_ctrl_type]->updateSetpoint(d.flats.x(), d.flats.v(), d.flats.a());
+  position_controllers_map_[current_ctrl]->updateSetpoint(
+      d.flats.x(), d.flats.v(), d.flats.a());
 
   // send the command
-  d.thrust_cmd = position_controllers_map_[current_ctrl_type]->Update(t, d.state.position, d.state.velocity);
+  d.thrust_cmd = position_controllers_map_[current_ctrl]->Update(
+      d.time_.t_s, d.state.position, d.state.velocity);
 }
 
 } // namespace kite_ros

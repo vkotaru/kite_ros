@@ -1,11 +1,9 @@
-//
-// Created by kotaru on 2/25/23.
-//
-
-#ifndef SRC_KITE_ROS_KITE_COMPANIONS_COMMON_H_
-#define SRC_KITE_ROS_KITE_COMPANIONS_COMMON_H_
+#ifndef KITE_ROS_KITE_COMPANIONS_COMMON_H_
+#define KITE_ROS_KITE_COMPANIONS_COMMON_H_
 
 #include "kite_control/kite_control.h"
+#include "kite_companions/timer.h"
+#include <ros/ros.h>
 
 namespace kite_ros {
 
@@ -69,6 +67,7 @@ struct Logger {
   }
 };
 
-} // namespace kite_ros
 
-#endif // SRC_KITE_ROS_KITE_COMPANIONS_COMMON_H_
+
+} // namespace kite_ros
+#endif // KITE_ROS_KITE_COMPANIONS_COMMON_H_

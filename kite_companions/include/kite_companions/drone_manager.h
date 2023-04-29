@@ -7,6 +7,7 @@
 #include <memory>
 #include <iostream>
 
+#include <eigen_conversions/eigen_msg.h>
 #include "kite_companions/common.h"
 #include "kite_control/kite_control.h"
 
@@ -60,12 +61,21 @@ public:
     double time(const double &t) const { return t - start_time; }
   };
 
+  // TODO Implement a better and safe data interface.
   struct Data {
+      Timer time_{};
       struct State {
-          Eigen::Vector3d position;
-          Eigen::Vector3d velocity;
-          Eigen::Matrix3d orientation;
-          Eigen::Vector3d angular_velocity;
+          EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+          
+          double last_update_s{0.};
+          Eigen::Vector3d position{};
+          Eigen::Vector3d velocity{};
+          Eigen::Quaterniond quaternion{};
+          // Eigen::Matrix3d orientation;
+          Eigen::Vector3d angular_velocity{};
+
+
+          Eigen::Matrix3d rotation() { return quaternion.toRotationMatrix(); }
       } state;
 
       Eigen::Vector3d home_position;
@@ -82,12 +92,12 @@ protected:
 
   std::map<POSITION_CONTROL, std::unique_ptr<control::PositionController>>
       position_controllers_map_;
-  POSITION_CONTROL current_ctrl_type{POSITION_CONTROL::POSITION_PID};
+  POSITION_CONTROL current_ctrl{POSITION_CONTROL::POSITION_PID};
 
   FlightConfig config_{};
 
-  void land(const double t);
-  void takeoff(const double t);
+  void LandInternal(const double t);
+  void TakeoffInternal(const double t);
 
 public:
   DroneManager();
@@ -95,12 +105,12 @@ public:
 
   ~DroneManager() = default;
 
-  void init();
-  void updateCommandTraj(const double t);
-  void run(const double t);
+  void Initialize();
+  void UpdateCommandTraj(const double t);
+  void Run();
 
-  bool setFlightMode(const double t, const EVENT& event_req);
-  bool setControlType(const POSITION_CONTROL &control_type);
+  bool SetFlightMode(const double t, const EVENT& event_req);
+  bool SetControlType(const POSITION_CONTROL &control_type);
 
   // getters
   inline const Data &data() const { return d; }

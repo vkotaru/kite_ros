@@ -92,25 +92,25 @@ void KITEGazeboPlugin::Load(gazebo::physics::ModelPtr _model,
 void KITEGazeboPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
 
 #if GAZEBO_MAJOR_VERSION >= 8
-  cur_time = this->world_->SimTime();
+  curr_time = this->world_->SimTime();
 #else
-  cur_time = this->world_->GetSimTime();
+  curr_time = this->world_->GetSimTime();
 #endif
 
-  if (cur_time < last_time_) {
+  if (curr_time < last_time_) {
     gzdbg << "[QuadrotorSIL] Negative update time difference detected.\n";
-    last_time_ = cur_time;
+    last_time_ = curr_time;
   }
   // rate control
   if (update_rate_Hz > 0 &&
-      (cur_time - last_time_).Double() < (1.0 / this->update_rate_Hz)) {
+      (curr_time - last_time_).Double() < (1.0 / this->update_rate_Hz)) {
     // too fast; 1./update_rate_Hz time hasn't elapsed yet!
   } else {
     // compute "dt"
-    loop_dt_s = cur_time.Double() - last_time_.Double();
+    loop_dt_s = curr_time.Double() - last_time_.Double();
     printf("loop_dt_s_freq, %f\n", 1. / loop_dt_s);
     run();
-    last_time_ = cur_time;
+    last_time_ = curr_time;
   }
 }
 

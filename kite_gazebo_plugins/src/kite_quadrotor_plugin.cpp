@@ -10,14 +10,26 @@ KITEQuadrotorPlugin::KITEQuadrotorPlugin()
     : KITEGazeboPlugin("KITEQuadrotorPlugin") {}
 
 void KITEQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
-                                sdf::ElementPtr _sdf) {
+                               sdf::ElementPtr _sdf) {
   loadAndReadDefaultParams(_model, _sdf);
   // read params from sdf specific to this plugin
 
   // Note, all ros messages are published at the same rate
   if (_sdf->HasElement("publishRate")) {
     this->ros_publish_rate_Hz = _sdf->GetElement("publishRate")->Get<double>();
-    gzdbg << "[" << plugin_name_ << "] publish rate " << ros_publish_rate_Hz
+    gzdbg << "[" << plugin_name_ << "] publishRate " << ros_publish_rate_Hz
+          << std::endl;
+  }
+  if (_sdf->HasElement("attitudeControlRate")) {
+    this->att_loop_rate_Hz =
+        _sdf->GetElement("attitudeControlRate")->Get<double>();
+    gzdbg << "[" << plugin_name_ << "] attitudeControlRate " << att_loop_rate_Hz
+          << std::endl;
+  }
+  if (_sdf->HasElement("positionControlRate")) {
+    this->pos_loop_rate_Hz =
+        _sdf->GetElement("positionControlRate")->Get<double>();
+    gzdbg << "[" << plugin_name_ << "] positionControlRate " << pos_loop_rate_Hz
           << std::endl;
   }
 
@@ -33,14 +45,24 @@ void KITEQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
   attitude_controller_.updateInertia(d.inertia);
 
   pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
-      "kite_quadrotor_plugin/odometry", 1);
+      "kite_quadrotor_plugin/odometry", 10);
   sub_command_ =
       this->nh_->subscribe("kite_quadrotor_plugin/command", 10,
-                           &KITEQuadrotorPlugin::commandCallback, this);
+                           &KITEQuadrotorPlugin::CommandCallback, this);
 
   this->last_time_ = this->world_->SimTime();
-  pos_timer_.init(this->world_->SimTime());
-  att_timer_.init(this->world_->SimTime());
+
+  // initialize timers
+  timers_.push_back(std::make_unique<GazeboTimer>(
+      pos_loop_rate_Hz, [this](double dt) { this->PositionControlLoop(dt); }));
+  timers_.push_back(std::make_unique<GazeboTimer>(
+      att_loop_rate_Hz, [this](double dt) { this->AttitudeControlLoop(dt); }));
+  timers_.push_back(std::make_unique<GazeboTimer>(
+      ros_publish_rate_Hz, [this](double dt) { this->PublishRosTopics(dt); }));
+
+  for (auto &timer : timers_) {
+    timer->init(this->world_->SimTime());
+  }
 
   updateConnection_ = gazebo::event::Events::ConnectWorldUpdateBegin(
       boost::bind(&KITEQuadrotorPlugin::OnUpdate, this, _1));
@@ -50,25 +72,26 @@ void KITEQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
 
 void KITEQuadrotorPlugin::OnUpdate(const gazebo::common::UpdateInfo &_info) {
 
-  cur_time = this->world_->SimTime();
-  if (cur_time < last_time_) {
+  curr_time = this->world_->SimTime();
+  if (curr_time < last_time_) {
     gzdbg << "[QuadrotorSIL] Negative update time difference detected.\n";
-    last_time_ = cur_time;
+    last_time_ = curr_time;
   }
 
-  queryState();
-  pos_timer_.run(cur_time);
-  att_timer_.run(cur_time);
+  QueryState();
+  for (auto &timer : timers_) {
+    timer->run(curr_time);
+  }
 
   // apply wrench to the quadrotor rigid body
   Eigen::Vector3d body_force_body_frame = d.scalar_thrust * E3;
   Eigen::Vector3d body_moment_body_frame = d.moment;
-  applyWrench(body_force_body_frame, body_moment_body_frame);
+  ApplyWrench(body_force_body_frame, body_moment_body_frame);
 
-  last_time_ = cur_time;
+  last_time_ = curr_time;
 }
 
-void KITEQuadrotorPlugin::queryState() {
+void KITEQuadrotorPlugin::QueryState() {
   // TODO use an independent rate for state query
   auto gz_pose = link_->WorldCoGPose();
   auto gz_vel = link_->RelativeLinearVel();
@@ -80,7 +103,7 @@ void KITEQuadrotorPlugin::queryState() {
   d.state.rotation = gazeboQuaternionToEigenMatrix(gz_pose.Rot());
 }
 
-void KITEQuadrotorPlugin::positionControlLoop(const double dt) {
+void KITEQuadrotorPlugin::PositionControlLoop(const double dt) {
 
   if (mode_ == kite_msgs::QCommand::MODE_POSITION ||
       mode_ == kite_msgs::QCommand::MODE_POSITION_SPLINE) {
@@ -90,7 +113,7 @@ void KITEQuadrotorPlugin::positionControlLoop(const double dt) {
   }
 }
 
-void KITEQuadrotorPlugin::attitudeControlLoop(const double dt) {
+void KITEQuadrotorPlugin::AttitudeControlLoop(const double dt) {
 
   if (mode_ != kite_msgs::QCommand::MODE_PASS_THROUGH) {
     d.scalar_thrust = d.thrust_v.dot(d.state.rotation.col(2));
@@ -100,8 +123,8 @@ void KITEQuadrotorPlugin::attitudeControlLoop(const double dt) {
   }
 }
 
-void KITEQuadrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
-                                       const Eigen::Vector3d &moment_v) {
+void KITEQuadrotorPlugin::ApplyWrench(const Eigen::Vector3d &thrust_v,
+                                      const Eigen::Vector3d &moment_v) {
 
   GazeboVector force = vec3EigenToGazebo(thrust_v);
   GazeboVector torque = vec3EigenToGazebo(moment_v);
@@ -110,7 +133,7 @@ void KITEQuadrotorPlugin::applyWrench(const Eigen::Vector3d &thrust_v,
   link_->AddRelativeTorque(torque - link_->GetInertial()->CoG().Cross(force));
 }
 
-void KITEQuadrotorPlugin::rosPublish() {
+void KITEQuadrotorPlugin::PublishRosTopics(const double dt) {
   auto pose = Pose3D(link_);
   nav_msgs::Odometry odometry_;
   odometry_.header.stamp.sec = world_->SimTime().sec;
@@ -125,7 +148,7 @@ void KITEQuadrotorPlugin::rosPublish() {
   pub_odom_truth_.publish(odometry_);
 }
 
-void KITEQuadrotorPlugin::commandCallback(
+void KITEQuadrotorPlugin::CommandCallback(
     const kite_msgs::QCommandStamped::ConstPtr &msg) {
 
   mode_ = msg->command.mode;

@@ -53,7 +53,9 @@
     </plugin>
 
     <plugin filename="libkite_quadrotor_plugin.so" name="kite_quadrotor_plugin">
-      <updateRate>500.0</updateRate>
+      <publishRate>200.0</publishRate>
+      <positionControlRate>100.0</positionControlRate>
+      <attitudeControlRate>500.0</attitudeControlRate>
       <linkName>base_link</linkName>
       <namespace>falcon</namespace>
     </plugin>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<launch>
+  <node pkg="kite_companions" type="drone_companion_node" name="drone_companion_node"
+    output="screen">
+    <param name="name" type="str" value="falcon" />
+    <remap from="falcon/command" to="falcon/kite_quadrotor_plugin/command" />
+    <remap from="falcon/odometry" to="falcon/kite_quadrotor_plugin/odometry" />
+  </node>
+</launch>

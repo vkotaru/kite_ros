@@ -28,7 +28,7 @@ protected:
   gazebo::common::Time plugin_loaded_time_;
   gazebo::common::Time last_plugin_update_;
   gazebo::common::Time last_time_;
-  gazebo::common::Time cur_time;
+  gazebo::common::Time curr_time;
   double update_rate_Hz{500.};
   double loop_dt_s{0.002};
 
