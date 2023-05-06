@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
         roscpp
         std_msgs
         eigen_conversions
+        ddynamic_reconfigure
         )
 
 catkin_package(

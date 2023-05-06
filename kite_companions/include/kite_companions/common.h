@@ -20,6 +20,29 @@ struct PositionBuffer {
   PositionBuffer(const double _x, const double _y, const double _z)
       : x(_x), y(_y), z(_z) {}
   double x, y, z;
+
+  Eigen::Vector3d operator()() {
+    return Eigen::Vector3d(x, y, z);
+  }
+
+  PositionBuffer operator+(const PositionBuffer &other) {
+    return PositionBuffer(x + other.x, y + other.y, z + other.z);
+  }
+  PositionBuffer operator+=(const PositionBuffer &other) {
+    x += other.x;
+    y += other.y;
+    z += other.z;
+    return *this;
+  }  
+  PositionBuffer operator+(const Eigen::Vector3d &other) {
+    return PositionBuffer(x + other[0], y + other[1], z + other[2]);
+  }
+  PositionBuffer operator+=(const Eigen::Vector3d &other) {
+    x += other[0];
+    y += other[1];
+    z += other[2];
+    return *this;
+  }
 };
 
 static const struct TerminalColors {
