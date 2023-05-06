@@ -79,8 +79,10 @@ public:
       } state;
 
       Eigen::Vector3d home_position;
-      Eigen::Vector3d setpoint_buffer;
-      Eigen::Vector3d position_setpoint;
+      Eigen::Vector3d takeoff_position;
+      Eigen::Vector3d setpoint;
+      // Eigen::Vector3d setpoint_buffer;
+
       FlatVariable_t flats;
 
       Eigen::Vector3d thrust_cmd;

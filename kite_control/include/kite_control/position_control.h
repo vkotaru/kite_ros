@@ -37,17 +37,17 @@ public:
 
   virtual void init() {}
 
-  void updateSetpoint(const Eigen::Vector3d &xd) {
+  void UpdateSetpoint(const Eigen::Vector3d &xd) {
     this->xd = xd;
     vd.setZero();
     ad.setZero();
   }
-  void updateSetpoint(const Eigen::Vector3d &xd, const Eigen::Vector3d &vd) {
+  void UpdateSetpoint(const Eigen::Vector3d &xd, const Eigen::Vector3d &vd) {
     this->xd = xd;
     this->vd = vd;
     ad.setZero();
   }
-  void updateSetpoint(const Eigen::Vector3d &xd, const Eigen::Vector3d &vd,
+  void UpdateSetpoint(const Eigen::Vector3d &xd, const Eigen::Vector3d &vd,
                       const Eigen::Vector3d &ad) {
     this->xd = xd;
     this->vd = vd;

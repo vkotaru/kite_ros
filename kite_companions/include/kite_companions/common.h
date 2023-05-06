@@ -43,6 +43,12 @@ struct PositionBuffer {
     z += other[2];
     return *this;
   }
+  PositionBuffer operator=(const Eigen::Vector3d &other) {
+    x = other[0];
+    y = other[1];
+    z = other[2];
+    return *this;
+  }
 };
 
 static const struct TerminalColors {

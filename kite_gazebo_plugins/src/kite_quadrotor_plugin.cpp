@@ -42,7 +42,7 @@ void KITEQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
       link_->GetInertial()->IZZ();
   d.inertia_inv = d.inertia.inverse();
   d.mass = link_->GetInertial()->Mass();
-  attitude_controller_.updateInertia(d.inertia);
+  attitude_controller_.UpdateInertia(d.inertia);
 
   pub_odom_truth_ = this->nh_->advertise<nav_msgs::Odometry>(
       "kite_quadrotor_plugin/odometry", 10);
@@ -117,7 +117,7 @@ void KITEQuadrotorPlugin::AttitudeControlLoop(const double dt) {
 
   if (mode_ != kite_msgs::QCommand::MODE_PASS_THROUGH) {
     d.scalar_thrust = d.thrust_v.dot(d.state.rotation.col(2));
-    attitude_controller_.updateCommand(d.thrust_v);
+    attitude_controller_.UpdateCommand(d.thrust_v);
     d.moment =
         attitude_controller_.Update(dt, d.state.rotation, d.state.ang_vel);
   }
@@ -157,7 +157,7 @@ void KITEQuadrotorPlugin::CommandCallback(
   case kite_msgs::QCommand::MODE_POSITION: {
     switch (msg->command.values.size()) {
     case 3:
-      position_controller_.updateSetpoint(
+      position_controller_.UpdateSetpoint(
           Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
                           msg->command.values[0].z),
           Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
@@ -167,7 +167,7 @@ void KITEQuadrotorPlugin::CommandCallback(
       break;
 
     case 2:
-      position_controller_.updateSetpoint(
+      position_controller_.UpdateSetpoint(
           Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
                           msg->command.values[0].z),
           Eigen::Vector3d(msg->command.values[1].x, msg->command.values[1].y,
@@ -175,7 +175,7 @@ void KITEQuadrotorPlugin::CommandCallback(
       break;
 
     case 1:
-      position_controller_.updateSetpoint(
+      position_controller_.UpdateSetpoint(
           Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
                           msg->command.values[0].z));
       break;
@@ -186,10 +186,14 @@ void KITEQuadrotorPlugin::CommandCallback(
   } break;
 
   case kite_msgs::QCommand::MODE_THRUST_YAW: {
-    d.thrust_v =
-        Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
-                        msg->command.values[0].z);
-    attitude_controller_.updateYawSetpoint(msg->command.yaw[0]);
+    if (msg->command.values.size() > 0) {
+      d.thrust_v =
+          Eigen::Vector3d(msg->command.values[0].x, msg->command.values[0].y,
+                          msg->command.values[0].z);
+    }
+    if (msg->command.yaw.size() > 0) {
+      attitude_controller_.UpdateYawSetpoint(msg->command.yaw[0]);
+    }
     break;
   }
 

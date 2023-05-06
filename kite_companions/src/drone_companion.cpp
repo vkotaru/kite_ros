@@ -22,15 +22,10 @@ DroneCompanion::DroneCompanion(const std::string &name, const std::string &ns)
 void DroneCompanion::Clock() { data_.time_.Update(ros::Time::now().toSec()); }
 
 void DroneCompanion::OdometryCallback(const nav_msgs::Odometry::ConstPtr &msg) {
-  ROS_INFO("callback freq: %f",
-           1. / (ros::Time::now().toSec() - data_.state.last_update_s));
   data_.state.last_update_s = ros::Time::now().toSec();
   tf::pointMsgToEigen(msg->pose.pose.position, data_.state.position);
   tf::quaternionMsgToEigen(msg->pose.pose.orientation, data_.state.quaternion);
   tf::vectorMsgToEigen(msg->twist.twist.linear, data_.state.velocity);
-
-  ROS_INFO("%f, %f, %f", data_.state.position.x(), data_.state.position.y(),
-           data_.state.position.z());
 }
 
 void DroneCompanion::Run() {
@@ -55,15 +50,40 @@ void DroneCompanion::Run() {
 }
 
 void DroneCompanion::PublishTopics() {
-  // Yet to be implemented
+  kite_msgs::QCommandStamped msg;
+  msg.header.stamp = ros::Time::now();
+  msg.header.frame_id = "world";
+  msg.command.mode = offboard_mode_key_;
+  if (offboard_mode_key_ ==
+      static_cast<int>(kite_msgs::QCommand::MODE_THRUST_YAW)) {
+    geometry_msgs::Vector3 thrust;
+    tf::vectorEigenToMsg(data_.thrust_cmd, thrust);
+    msg.command.values.push_back(thrust);
+  }
+
+  if (flags_.send_offboard_commands) {
+    pub_cmd_.publish(msg);
+  }
 }
 
-void DroneCompanion::RequestTakeoff() {}
+void DroneCompanion::RequestTakeoff() {
+  data_.home_position = data_.state.position;
+  // TODO add a check for offboard/onboard mode
+  agent_.SetFlightMode(GetTimeSinceStart(),
+                       DroneManager::EVENT::REQUEST_TAKEOFF);
+  setpoint_buffer_ = data_.setpoint;
+}
 
-void DroneCompanion::RequestLanding() {}
+void DroneCompanion::RequestLanding() {
+  agent_.SetFlightMode(GetTimeSinceStart(),
+                       DroneManager::EVENT::REQUEST_LANDING);
+  setpoint_buffer_ = data_.setpoint;
+}
 
 void DroneCompanion::RequestSetpointUpdate() {
-
+  data_.setpoint = setpoint_buffer_();
+  agent_.SetFlightMode(GetTimeSinceStart(),
+                       DroneManager::EVENT::REQUEST_SETPOINT);
 }
 
 void DroneCompanion::DynamicReconfigureSetup() {
@@ -127,8 +147,8 @@ void DroneCompanion::DynamicReconfigureSetup() {
         if (new_value) {
           RequestSetpointUpdate();
           flags_.update_setpoint = false;
-          ROS_INFO("Setpoint %f, %f, %f", this->setpoint_.x, this->setpoint_.y,
-                   this->setpoint_.z);
+          ROS_INFO("Setpoint %f, %f, %f", data_.setpoint[0], data_.setpoint[1],
+                   data_.setpoint[2]);
         }
       },
       "update setpoint");
@@ -138,12 +158,11 @@ void DroneCompanion::DynamicReconfigureSetup() {
         this->flags_.send_offboard_commands = new_value;
       },
       "start sending offboard control");
-  
+
   // NOTE: there seems to be a limit on the number of registeredVariables
   // Node might crashes for large number of registervariables
   ddr_cmds->publishServicesTopics();
   ddynrec_.push_back(ddr_cmds);
-
 }
 
 } // namespace kite_ros

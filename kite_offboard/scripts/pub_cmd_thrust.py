@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from concurrent.futures import thread
 import rospy
-from kite_msgs.msg import QCommandStamped
+from kite_msgs.msg import QCommandStamped, QCommand
 from geometry_msgs.msg import Vector3
 from nav_msgs.msg import Odometry
 import numpy as np
@@ -16,8 +16,8 @@ def callback(data):
 
 def publish_thrust():
     global position, velocity
-    pub  = rospy.Publisher('/falcon/command', Command, queue_size=10)
-    rospy.Subscriber('/falcon/falcon/qrotor_plugin/odometry', Odometry, callback)
+    pub  = rospy.Publisher('/falcon/kite_quadrotor_plugin/command', QCommandStamped, queue_size=10)
+    rospy.Subscriber('/falcon/kite_quadrotor_plugin/odometry', Odometry, callback)
     rospy.init_node('command', anonymous=True)
     rospy.loginfo("Initialzing publish command rosnode")
     rate = rospy.Rate(100)  # 10hz
@@ -31,12 +31,13 @@ def publish_thrust():
     while not rospy.is_shutdown():
         thurst = -np.multiply(position-setpoint, kx) - np.multiply(velocity, kv) + gvec*mass
 
-        msg = Command()
-        msg.mode = Command.MODE_THRUST_YAW
+        msg = QCommandStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.command.mode = QCommand.MODE_THRUST_YAW
         t = Vector3()
         t.x, t.y, t.z = thurst[0],  thurst[1],  thurst[2]
-        msg.command.append(t)
-        msg.yaw.append(0)
+        msg.command.values.append(t)
+        msg.command.yaw.append(0)
         # print(thurst)
         pub.publish(msg)
         rate.sleep()

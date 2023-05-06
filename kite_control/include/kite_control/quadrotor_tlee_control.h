@@ -43,14 +43,14 @@ public:
                           .finished()) {}
   ~SO3Controller() = default;
 
-  void updateInertia(const Eigen::Matrix3d &inertia) {
+  void UpdateInertia(const Eigen::Matrix3d &inertia) {
     inertia_ = inertia;
     inertia_inv_ = inertia.inverse();
   }
 
-  void updateYawSetpoint(const double &_yaw) { yaw_sp = _yaw; }
+  void UpdateYawSetpoint(const double &_yaw) { yaw_sp = _yaw; }
 
-  void updateCommand(const Eigen::Vector3d &thrust_v) {
+  void UpdateCommand(const Eigen::Vector3d &thrust_v) {
     Eigen::Vector3d E1d{1., 0., 0}, E1c{1., 0., 0.}, E2c{0., 1., 0},
         E3c{0., 0., 1};
 
@@ -66,14 +66,14 @@ public:
     Rd << E1c, E2c, E3c;
   }
 
-  void updateCommand(const Eigen::Vector3d &thrust_v,
+  void UpdateCommand(const Eigen::Vector3d &thrust_v,
                      const Eigen::Vector3d &Omd) {
-    updateCommand(thrust_v);
+    UpdateCommand(thrust_v);
     this->Omd = Omd;
   }
-  void updateCommand(const Eigen::Vector3d &thrust_v,
+  void UpdateCommand(const Eigen::Vector3d &thrust_v,
                      const Eigen::Vector3d &Omd, const Eigen::Vector3d &dOmd) {
-    updateCommand(thrust_v);
+    UpdateCommand(thrust_v);
     this->Omd = Omd;
     this->dOmd = dOmd;
   }

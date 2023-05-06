@@ -17,9 +17,9 @@
 
 #include "kite_companions/drone_manager.h"
 
-#include <nav_msgs/Odometry.h>
 #include <kite_msgs/QCommand.h>
 #include <kite_msgs/QCommandStamped.h>
+#include <nav_msgs/Odometry.h>
 
 namespace kite_ros {
 
@@ -36,7 +36,6 @@ protected:
   DroneManager::Data data_{};
   DroneManager agent_;
 
-
   // Publishers
   ros::Publisher pub_cmd_;
   // Subscribers
@@ -51,6 +50,9 @@ private:
   std::string ns_;
   std::unique_ptr<ros::NodeHandle> nh_;
   void Clock();
+  double GetTimeSinceStart() {
+    return ros::Time::now().toSec() - data_.time_.start_s;
+  }
 
   // User interface
   // ddynamic reconfigure
@@ -64,15 +66,16 @@ private:
       {"MODE_ATTITUDE", kite_msgs::QCommand::MODE_ATTITUDE},
       {"MODE_ATTITUDE_RATE", kite_msgs::QCommand::MODE_ATTITUDE_RATE},
       {"MODE_THRUST_YAW", kite_msgs::QCommand::MODE_THRUST_YAW}};
-  int offboard_mode_key_{2};
+  int offboard_mode_key_{
+      static_cast<int>(kite_msgs::QCommand::MODE_THRUST_YAW)};
 
   std::map<std::string, int> enum_position_ctrl_type = {
-      {"POSITION_PID", static_cast<int>(DroneManager::POSITION_CONTROL::POSITION_PID)},
-      {"POSITION_CLF_QP", static_cast<int>(DroneManager::POSITION_CONTROL::POSITION_CLF_QP)}};
+      {"POSITION_PID",
+       static_cast<int>(DroneManager::POSITION_CONTROL::POSITION_PID)},
+      {"POSITION_CLF_QP",
+       static_cast<int>(DroneManager::POSITION_CONTROL::POSITION_CLF_QP)}};
   int pos_ctrl_type_key_{0};
-  
-  PositionBuffer setpoint_{0., 0., 0.};
-  PositionBuffer takeoff_position_{0., 0., 0.};
+
   PositionBuffer setpoint_buffer_{};
   struct Flags {
     bool update_setpoint{false};
@@ -89,7 +92,6 @@ private:
   void RequestTakeoff();
   void RequestLanding();
   void RequestSetpointUpdate();
-
 };
 
 } // namespace kite_ros

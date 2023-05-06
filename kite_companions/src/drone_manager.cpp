@@ -28,6 +28,8 @@ void DroneManager::LandInternal(const double t) {
 
   Eigen::Vector3d end_pt = d.state.position;
   end_pt(2) = d.home_position(2);
+  d.setpoint = end_pt;
+
   std::cout << "Landing position " << end_pt.transpose() << std::endl;
   traj_gen_.go_to.reset(t, d.state.position, end_pt, 3);
   SetControlType(POSITION_CONTROL::POSITION_PID);
@@ -38,8 +40,10 @@ void DroneManager::TakeoffInternal(const double t) {
   config_.start_time = t;
   config_.end_time = 3;
 
-  Eigen::Vector3d end_pt = d.state.position;
-  end_pt(2) = 1.5;
+  d.takeoff_position = d.state.position + Eigen::Vector3d(0, 0, 1.0);
+  d.setpoint = d.takeoff_position;
+
+  Eigen::Vector3d end_pt = d.setpoint;
   std::cout << "Takeoff position " << end_pt.transpose() << std::endl;
   traj_gen_.go_to.reset(t, d.state.position, end_pt, 3);
   SetControlType(POSITION_CONTROL::POSITION_PID);
@@ -69,31 +73,19 @@ bool DroneManager::SetFlightMode(const double t, const EVENT &event_req) {
 
   case FLIGHT_MODE::SETPOINT: {
     if (event_req == EVENT::REQUEST_SETPOINT) {
-      d.position_setpoint = d.setpoint_buffer;
-      traj_gen_.setpoint.reset(d.setpoint_buffer);
+      traj_gen_.setpoint.reset(d.setpoint);
       d.flats = traj_gen_.setpoint.run(0);
     } else if (event_req == EVENT::REQUEST_LANDING) {
       LandInternal(t);
     } else if (event_req == EVENT::REQUEST_TRAJECTORY) {
       std::cout << "EVENT::REQUEST_TRAJECTORY not implemented" << std::endl;
       return false;
-      // config_.mode = FLIGHT_MODE::TRAJECTORY;
-      // Eigen::Vector3d center = d.state.position;
-      // center(2) = d.flats.x()(2);
-      // if (d.traj_type_ == 0) {
-      //   traj_gen_.square.reset(t, center, 1, 4);
-      // } else if (d.traj_type_ == 1) {
-      //   std::cout << "Circular trajectory not implemented yet!" << std::endl;
-      // } else if (d.traj_type_ == 2) {
-      //   traj_gen_.var_freq.update_params(d.traj_info_.params_);
-      //   traj_gen_.var_freq.reset(t, center);
-      // }
 
     } else if (event_req == EVENT::REQUEST_GOTO) {
       config_.mode = FLIGHT_MODE::GOTO;
       config_.start_time = t;
       config_.end_time = 3;
-      traj_gen_.go_to.reset(t, d.state.position, d.setpoint_buffer, 3);
+      traj_gen_.go_to.reset(t, d.state.position, d.setpoint, 3);
     }
     break;
   }
@@ -125,7 +117,6 @@ void DroneManager::UpdateCommandTraj(const double t) {
       config_.mode = FLIGHT_MODE::SETPOINT;
     } else {
       d.flats = traj_gen_.go_to.run(t);
-      std::cout << d.flats.x().transpose() << std::endl;
     }
   } break;
 
@@ -158,45 +149,23 @@ void DroneManager::UpdateCommandTraj(const double t) {
     }
   } break;
 
-  case FLIGHT_MODE::TRAJECTORY:
-    // if (d.traj_type_ == 0) {
-    //   d.flats = traj_gen_.square.run(t);
-    //   if (traj_gen_.square.done(t)) {
-
-    //     traj_gen_.setpoint.reset(traj_gen_.square.center_);
-    //     d.flats = traj_gen_.setpoint.run(0);
-
-    //     std::cout << "TRAJECTORY complete switching to SETPOINT @ "
-    //               << traj_gen_.square.center_.transpose() << std::endl;
-    //     config_.mode = FLIGHT_MODE::SETPOINT;
-    //   }
-    // } else if (d.traj_type_ == 1) {
-
-    // } else if (d.traj_type_ == 2) {
-    //   d.flats = traj_gen_.var_freq.run(t);
-    //   if (traj_gen_.var_freq.done(t)) {
-    //     traj_gen_.setpoint.reset(traj_gen_.var_freq.prev_x);
-    //     d.flats = traj_gen_.setpoint.run(0);
-    //     std::cout << "TRAJECTORY complete switching to SETPOINT @ "
-    //               << traj_gen_.var_freq.prev_x.transpose() << std::endl;
-    //     config_.mode = FLIGHT_MODE::SETPOINT;
-    //   }
-    // }
-    break;
-
   default:
-
     break;
   }
 }
 
 void DroneManager::Run() {
+  if (config_.mode == FLIGHT_MODE::IDLE) {
+    d.thrust_cmd = Eigen::Vector3d::Zero();
+    return;
+  }
+
   // update the command
   UpdateCommandTraj(d.time_.t_s);
 
   // update the controller setpoint
   // TODO: avoid passing this everytime
-  position_controllers_map_[current_ctrl]->updateSetpoint(
+  position_controllers_map_[current_ctrl]->UpdateSetpoint(
       d.flats.x(), d.flats.v(), d.flats.a());
 
   // send the command
