@@ -1,5 +1,9 @@
-#ifndef KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PLUGIN_H_
-#define KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PLUGIN_H_
+//
+// Created by kotaru on 2/10/23.
+//
+
+#ifndef KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PAYLOAD_PLUGIN_H_
+#define KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PAYLOAD_PLUGIN_H_
 
 #include "kite_gazebo_plugins/kite_gazebo_plugin.h"
 #include <eigen_conversions/eigen_msg.h>
@@ -11,7 +15,7 @@
 
 namespace kite_ros {
 
-class KITEQuadrotorPlugin : public KITEGazeboPlugin {
+class KITEQuadrotorPayloadPlugin : public KITEQuadrotorPlugin {
 public:
   struct State {
     Eigen::Matrix3d rotation;
@@ -45,9 +49,11 @@ public:
     COUNT
   };
 
+  
+
 public:
-  explicit KITEQuadrotorPlugin(std::string name = "KITEQuadrotorPlugin");
-  ~KITEQuadrotorPlugin() override = default;
+  explicit KITEQuadrotorPayloadPlugin(std::string name = "KITEQuadrotorPayloadPlugin");
+  ~KITEQuadrotorPayloadPlugin() override = default;
 
 protected:
   void Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf) override;
@@ -85,4 +91,4 @@ protected:
 };
 
 } // namespace kite_ros
-#endif // KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PLUGIN_H_
+#endif // KITE_ROS_KITE_GAZEBO_PLUGINS_KITE_QUADROTOR_PAYLOAD_PLUGIN_H_

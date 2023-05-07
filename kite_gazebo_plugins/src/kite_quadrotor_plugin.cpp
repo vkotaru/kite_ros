@@ -1,13 +1,9 @@
-//
-// Created by kotaru on 2/10/23.
-//
-
 #include "kite_gazebo_plugins/kite_quadrotor_plugin.h"
 
 namespace kite_ros {
 
-KITEQuadrotorPlugin::KITEQuadrotorPlugin()
-    : KITEGazeboPlugin("KITEQuadrotorPlugin") {}
+KITEQuadrotorPlugin::KITEQuadrotorPlugin(std::string name)
+    : KITEGazeboPlugin(std::move(name)) {}
 
 void KITEQuadrotorPlugin::Load(gazebo::physics::ModelPtr _model,
                                sdf::ElementPtr _sdf) {

@@ -1,9 +1,3 @@
-//
-// Created by kotaru on 2/10/23.
-//
-
-#include <utility>
-
 #include "kite_gazebo_plugins/common.h"
 #include "kite_gazebo_plugins/kite_gazebo_plugin.h"
 

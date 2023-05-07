@@ -138,9 +138,9 @@ public:
     corners_[3] = Point_t(center_(0) + side_, center_(1) + side_, center_(2));
     corners_[4] = Point_t(center_(0) + side_, center_(1) - side_, center_(2));
 
-    for (const auto &c : corners_) {
-      std::cout << c.transpose() << std::endl;
-    }
+    // for (const auto &c : corners_) {
+    //   std::cout << c.transpose() << std::endl;
+    // }
 
     sides_[0].reset(start_time_, center_, corners_.at(0), time_);
     int it = 0;
