@@ -1,0 +1,87 @@
+<?xml version="1.0" ?>
+<sdf version="1.5">
+<model name="KITE_TMP_MDL">
+<static> 0 </static>
+
+<link name="base_link">
+	
+<inertial>
+	<pose>0.0	0.0	0.0	0.0	0.0	0.0	</pose>
+
+<mass>0.9</mass>
+<inertia>
+	
+<ixx>0.0049</ixx>
+<iyy>0.0053</iyy>
+<izz>0.0098</izz>
+<ixy>5.5e-06</ixy>
+<ixz>5.4e-06</ixz>
+<iyz>2.1e-05</iyz>
+
+</inertia>
+
+</inertial>
+<collision name="collision">
+	<pose>0.0	0.0	0.0	0.0	0.0	0.0	</pose>
+
+<geometry>
+	
+<box>
+	
+<size>0.2505 0.2505 0.09</size>
+
+</box>
+
+</geometry>
+</collision>
+
+<visual name="visual">
+	<pose>0.0	0.0	0.0	0.0	0.0	-1.570796	</pose>
+
+<geometry>
+	
+<mesh>
+	
+<uri>model://falcon_cs_payload/meshes/dega.dae</uri>
+<scale>0.001 0.001 0.001</scale>
+
+</mesh>
+
+</geometry>
+<material>
+	
+<script>
+	
+<uri>file://media/materials/scripts/gazebo.material</uri>
+<name>Gazebo/Red</name>
+
+</script>
+
+</material>
+</visual>
+
+</link>
+
+<!-- Groundtruth plugin -->
+<plugin name="falcon_cs_payload_groundtruth_sim" filename="libgazebo_ros_p3d.so">
+  <alwaysOn>true</alwaysOn>
+  <updateRate>200.0</updateRate>
+  <bodyName>base_link</bodyName>
+  <topicName>/falcon_cs_payload/odometry/groundtruth</topicName>
+  <gaussianNoise>0.0</gaussianNoise>
+  <frameName>world</frameName>
+  <xyzOffsets>0 0 0</xyzOffsets>
+  <rpyOffsets>0 0 0</rpyOffsets>
+</plugin>
+        
+<!-- Kite Quadrotor plugin-->
+<plugin filename="libkite_quadrotor_plugin.so" name="falcon_cs_payload_kite_quadrotor_plugin">
+  <publishRate>200.0</publishRate>
+  <positionControlRate>100.0</positionControlRate>
+  <attitudeControlRate>500.0</attitudeControlRate>
+  <linkName>base_link</linkName>
+  <namespace>falcon_cs_payload</namespace>
+</plugin>
+        
+</model>
+</sdf>

@@ -5,6 +5,7 @@ import json
 import math
 import numpy as np
 
+
 class SDFGenerator(object):
     def __init__(self, name, folder=''):
         self.name = name
@@ -25,7 +26,7 @@ class SDFGenerator(object):
         self.file_.truncate(0)
         self.file_.write("<?xml version=\"1.0\" ?>\n"
                          "<sdf version=\"1.5\">\n"
-                         "<model name=\""+self.name+"\">\n"
+                         "<model name=\"" + self.name + "\">\n"
                          "<static> 0 </static>\n")
 
     def generateConfigFile(self):
@@ -49,24 +50,79 @@ class SDFGenerator(object):
         config_file_.write(s)
         config_file_.close()
 
-    def addline(self, s):
+    def addLine(self, s):
         print(s)
         self.file_.write(s + "\n")
 
     def close(self):
-        self.addline("</model>")
-        self.addline("</sdf>")
+        self.addLine("</model>")
+        self.addLine("</sdf>")
         self.file_.close()
 
-    def add2Tag(self, s, tagname):
-        return "<" + tagname+">\n" + "{}\n".format(s) + "</" + tagname + ">"
+    def addTag(self, s, tagname, name=None):
+        if name is not None:
+            return "\n<" + tagname + " name=\"" + name + "\">\n\t" + s + "\n</" + tagname + ">\n"
+        return "\n<" + tagname + ">\n" + "\t{}\n".format(
+            s) + "\n</" + tagname + ">"
 
-    def addLinkInertial(self, mass, inertia):
+    def addInlineTag(self, s, tagname, name=None):
+        if name is not None:
+            return "\n<" + tagname + " name=\"" + name + "\">" + s + "</" + tagname + ">"
+        return "\n<" + tagname + ">" + "{}".format(s) + "</" + tagname + ">"
+
+    def addInertial(self, pose, mass, inertia=None):
         s = ''
-        s += self.add2Tag("0. 0. 0. 0. 0. 0.", "pose") + "\n"
-        s += self.add2Tag(mass, "mass")
-        # s += self.add2Tag
-        s = self.add2Tag(s, "inertial")
+        s += self.addPoseTag(pose)
+        s += self.addInlineTag(mass, "mass")
+        inertia_str = ""
+        if inertia is not None:
+            if inertia.ndim == 2:
+                inertia_str += self.addInlineTag(inertia[0, 0], "ixx")
+                inertia_str += self.addInlineTag(inertia[0, 1], "ixy")
+                inertia_str += self.addInlineTag(inertia[0, 2], "ixz")
+                inertia_str += self.addInlineTag(inertia[1, 1], "iyy")
+                inertia_str += self.addInlineTag(inertia[1, 2], "iyz")
+                inertia_str += self.addInlineTag(inertia[2, 2], "izz")
+            elif inertia.ndim == 1:
+                inertia_str += self.addInlineTag(inertia[0], "ixx")
+                inertia_str += self.addInlineTag(inertia[1], "iyy")
+                inertia_str += self.addInlineTag(inertia[2], "izz")
+                if inertia.shape[0] == 6:
+                    inertia_str += self.addInlineTag(inertia[3], "ixy")
+                    inertia_str += self.addInlineTag(inertia[4], "ixz")
+                    inertia_str += self.addInlineTag(inertia[5], "iyz")
+                else:
+                    inertia_str += self.addInlineTag(0., "ixy")
+                    inertia_str += self.addInlineTag(0., "ixz")
+                    inertia_str += self.addInlineTag(0., "iyz")
+            else:
+                raise ValueError("Inertia must be 1D or 2D array")
+            s += self.addTag(inertia_str, "inertia")
+        s = self.addTag(s, "inertial")
+        return s
+
+    def addCollision(self, size, pose=np.zeros(6)):
+        pose_str = self.addPoseTag(pose)
+        geom_str = self.addInlineTag("{} {} {}".format(*size), "size")
+        geom_str = self.addTag(geom_str, "box")
+        geom_str = self.addTag(geom_str, "geometry")
+        s = self.addTag(pose_str + geom_str, "collision", name="collision")
+        return s
+
+    def addVisual(self, uri, scale, color="Red", pose=np.zeros(6)):
+        pose_str = self.addPoseTag(pose)
+        geom_str = self.addInlineTag(uri, "uri")
+        geom_str += self.addInlineTag("{} {} {}".format(*scale), "scale")
+        geom_str = self.addTag(geom_str, "mesh")
+        geom_str = self.addTag(geom_str, "geometry")
+        material_str = self.addInlineTag(
+            "file://media/materials/scripts/gazebo.material", "uri")
+        material_str += self.addInlineTag("Gazebo/" + color, "name")
+        material_str = self.addTag(material_str, "script")
+        material_str = self.addTag(material_str, "material")
+        s = self.addTag(pose_str + geom_str + material_str,
+                        "visual",
+                        name="visual")
         return s
 
     def addPoseTag(self, pose):
@@ -77,11 +133,11 @@ class SDFGenerator(object):
         s += "</pose>\n"
         return s
 
-    def includeObject(self,  object, pose, name):
+    def includeObject(self, object, pose, name):
         s = "<include>\n"
-        s += "<uri>model://"+object+"</uri>\n"
+        s += "<uri>model://" + object + "</uri>\n"
         s += self.addPoseTag(pose)
-        s += "<name>"+name+"</name>\n"
+        s += "<name>" + name + "</name>\n"
         s += "</include>\n"
         return s
 
@@ -92,30 +148,67 @@ class SDFGenerator(object):
         # s += "<name>"+name+"</name>\n"
         # s += "</include>\n"
         s = self.includeObject("drone", pose, name)
-        s += "<plugin filename=\"libqrotor_gazebo_plugin.so\" name=\"qrotor_plugin_"+name+"\">\n"
-        s += "<linkName>"+name+"::base_link</linkName>\n"
-        s += "<namespace>"+name+"</namespace>\n"
-        s += "<updateRate>"+str(updateRate)+"</updateRate>\n</plugin>\n"
+        s += "<plugin filename=\"libqrotor_gazebo_plugin.so\" name=\"qrotor_plugin_" + name + "\">\n"
+        s += "<linkName>" + name + "::base_link</linkName>\n"
+        s += "<namespace>" + name + "</namespace>\n"
+        s += "<updateRate>" + str(updateRate) + "</updateRate>\n</plugin>\n"
         return s
 
-    def addGroundTruthPlugin(self, linkName, topicName, updateRate=200.0):
+    def addGroundTruthPlugin(self,
+                             plugin_name,
+                             link_name,
+                             topic_name,
+                             update_rate=200.0):
         s = """<!-- Groundtruth plugin -->
-  <plugin name="payload_ground_truth" filename="libgazebo_ros_p3d.so">
-    <alwaysOn>true</alwaysOn>
-    <updateRate>{}</updateRate>
-    <bodyName>{}</bodyName>
-    <topicName>{}</topicName>
-    <gaussianNoise>0.0</gaussianNoise>
-    <frameName>world</frameName>
-    <xyzOffsets>0 0 0</xyzOffsets>
-    <rpyOffsets>0 0 0</rpyOffsets>
-  </plugin>
-        """.format(updateRate, linkName, topicName)
+<plugin name="{}" filename="libgazebo_ros_p3d.so">
+  <alwaysOn>true</alwaysOn>
+  <updateRate>{}</updateRate>
+  <bodyName>{}</bodyName>
+  <topicName>{}</topicName>
+  <gaussianNoise>0.0</gaussianNoise>
+  <frameName>world</frameName>
+  <xyzOffsets>0 0 0</xyzOffsets>
+  <rpyOffsets>0 0 0</rpyOffsets>
+</plugin>
+        """.format(plugin_name, update_rate, link_name, topic_name)
         return s
 
-    def addCylinder(self, link_name, pose, l=1, r=0.1, mass=0.005, ixx=0.0001, iyy=0.0001,
-                    izz=0.0001, ixy=0., ixz=0., iyz=0., material='Yellow', roll=0., pitch=1.57079):
-        s = "<link name = \""+link_name+"\" >\n"
+    def addKiteQuadrotorPlugin(self,
+                         plugin_name,
+                         publish_rate=200.0,
+                         update_rate=500.0,
+                         namespace="kite",
+                         link_name="base_link",
+                         position_rate=100.0,
+                         attitude_rate=500.0):
+        str = """<!-- Kite Quadrotor plugin-->
+<plugin filename="libkite_quadrotor_plugin.so" name="{}">
+  <publishRate>{}</publishRate>
+  <positionControlRate>{}</positionControlRate>
+  <attitudeControlRate>{}</attitudeControlRate>
+  <linkName>{}</linkName>
+  <namespace>{}</namespace>
+</plugin>
+        """.format(plugin_name, publish_rate, position_rate, attitude_rate,
+                   link_name, namespace)
+        return str
+
+    def addCylinder(self,
+                    link_name,
+                    pose,
+                    l=1,
+                    r=0.1,
+                    mass=0.005,
+                    ixx=0.0001,
+                    iyy=0.0001,
+                    izz=0.0001,
+                    ixy=0.,
+                    ixz=0.,
+                    iyz=0.,
+                    material='Yellow',
+                    roll=0.,
+                    pitch=1.57079):
+        s = "<link name = \"" + link_name + "\" >\n"
         s += self.addPoseTag(pose)
         s2 = """
       <inertial>
@@ -177,14 +270,14 @@ class SDFGenerator(object):
         return s
 
     def addUniversalJoint(self, name, link1, link2, pose, k=0., c=0.):
-        s = "<joint name='"+name+"' type='universal'>\n"
-        s += "<parent>"+link1+"</parent>\n"
-        s += "<child>"+link2+"</child>\n"
+        s = "<joint name='" + name + "' type='universal'>\n"
+        s += "<parent>" + link1 + "</parent>\n"
+        s += "<child>" + link2 + "</child>\n"
         s += self.addPoseTag(pose)
-      #   s2 = """
-      # <parent>link_<%=i-1%></parent>
-      # <child>link_<%=i%></child>
-      # <pose><%= -half_body_length %> 0 0 0 -0 0</pose>
+        #   s2 = """
+        # <parent>link_<%=i-1%></parent>
+        # <child>link_<%=i%></child>
+        # <pose><%= -half_body_length %> 0 0 0 -0 0</pose>
 
         s2 = """<axis>
         <xyz>0 1 0</xyz>
@@ -223,9 +316,9 @@ class SDFGenerator(object):
         return s
 
     def addBallJoint(self, name, plink, clink, pose, k=0., c=0.):
-        s = "<joint name='"+name+"' type='ball'>\n"
-        s += "<parent>"+plink+"</parent>\n"
-        s += "<child>"+clink+"</child>\n"
+        s = "<joint name='" + name + "' type='ball'>\n"
+        s += "<parent>" + plink + "</parent>\n"
+        s += "<child>" + clink + "</child>\n"
         s += self.addPoseTag(pose)
         s2 = """<axis>
   <xyz>0 0 1</xyz>
@@ -258,22 +351,36 @@ class SDFGenerator(object):
         s += s2
         return s
 
-    def addTriangularPlank(self, link_name, pose=np.zeros(6), side=1, h=0.05, mass=1.0,  ixx=0.0001, iyy=0.0001,
-                    izz=0.0001, ixy=0., ixz=0., iyz=0., material='Yellow', roll=0., pitch=1.57079):
-      
-        izz = mass*side*side/2
-        ixx = 0.5*izz
-        iyy = 0.5*izz
+    def addTriangularPlank(self,
+                           link_name,
+                           pose=np.zeros(6),
+                           side=1,
+                           h=0.05,
+                           mass=1.0,
+                           ixx=0.0001,
+                           iyy=0.0001,
+                           izz=0.0001,
+                           ixy=0.,
+                           ixz=0.,
+                           iyz=0.,
+                           material='Yellow',
+                           roll=0.,
+                           pitch=1.57079):
+
+        izz = mass * side * side / 2
+        ixx = 0.5 * izz
+        iyy = 0.5 * izz
         print(ixx, iyy, izz)
 
-        shape =  """<point>{} 0.0</point>
+        shape = """<point>{} 0.0</point>
               <point>{} 0.0</point>
               <point>0.0 {}</point>
               <point>{} 0.0</point>
-              <height>{}</height>""".format(-side/2, side/2, 0.866*side, -side/2, h)
-      
-        com = side/(2*np.sqrt(3))
-              
+              <height>{}</height>""".format(-side / 2, side / 2, 0.866 * side,
+                                            -side / 2, h)
+
+        com = side / (2 * np.sqrt(3))
+
         s = """
       <link name="{}">
         {}
@@ -311,12 +418,27 @@ class SDFGenerator(object):
             </script>
           </material>
         </visual>  
-      </link>""".format(link_name, self.addPoseTag(pose), com, h/2, mass, ixx, iyy, izz, shape, shape, material)
+      </link>""".format(link_name, self.addPoseTag(pose), com, h / 2, mass,
+                        ixx, iyy, izz, shape, shape, material)
         return s
 
-    def addBox(self, link_name, pose=np.zeros(6), l=1., w=0.5, h=0.05, mass=1.0,  ixx=0.0001, iyy=0.0001,
-                    izz=0.0001, ixy=0., ixz=0., iyz=0., material='Yellow', roll=0., pitch=1.57079):
-                   
+    def addBox(self,
+               link_name,
+               pose=np.zeros(6),
+               l=1.,
+               w=0.5,
+               h=0.05,
+               mass=1.0,
+               ixx=0.0001,
+               iyy=0.0001,
+               izz=0.0001,
+               ixy=0.,
+               ixz=0.,
+               iyz=0.,
+               material='Yellow',
+               roll=0.,
+               pitch=1.57079):
+
         s = """
       <link name="{}">
         {}
@@ -354,9 +476,10 @@ class SDFGenerator(object):
             </script>
           </material>
         </visual>  
-      </link>""".format(link_name, self.addPoseTag(pose), mass, ixx, iyy, izz, l, w, h, l, w, h, material)
+      </link>""".format(link_name, self.addPoseTag(pose), mass, ixx, iyy, izz,
+                        l, w, h, l, w, h, material)
         return s
-    
+
     def addFixedJoint(self, joint_name, parent_link, child_link):
         s = """<joint name="{}" type="fixed">
         <parent>{}</parent>

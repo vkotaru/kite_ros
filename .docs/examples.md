@@ -22,7 +22,7 @@ roslaunch kite_sim spawm_sdf.launch model:=falcon
     roslaunch kite_sim spawm_sdf.launch model:=falcon
     ```
     <p float="left">
-      <img src="./quad_img1.png" width="500" /> 
+      <img src="./quad_img1.png" width="800" /> 
     </p>
 
 2. ROS launch a companion node to control the quadrotor model in gazebo, in a new terminal,
@@ -30,7 +30,7 @@ roslaunch kite_sim spawm_sdf.launch model:=falcon
     roslaunch kite_companions drone_companion_node.launch
     ```
     <p float="left">
-      <img src="./quad_img2.png" width="500" />
+      <img src="./quad_img2.png" width="800" />
     </p>
 
 3. Open rqt_reconfigure in a third terminal,
@@ -38,7 +38,7 @@ roslaunch kite_sim spawm_sdf.launch model:=falcon
     rosrun rqt_reconfigure rqt_reconfigure
     ```
     <p float="left">
-      <img src="./quad_img3.png" width="500" /> 
+      <img src="./quad_img3.png" width="800" /> 
     </p>
 
     - Enable sending offboard commands from companion node to the gazebo model by checking the box (step 1 in the image above).
